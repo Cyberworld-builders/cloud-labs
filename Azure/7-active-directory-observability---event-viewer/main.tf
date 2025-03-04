@@ -1,3 +1,32 @@
+# Variables
+
+variable "resource_group_name" {
+  description = "Name of the resource group"
+  type        = string
+}
+
+variable "location" {
+  description = "Azure region"
+  type        = string
+}
+
+variable "admin_username" {
+  description = "Admin username for VMs"
+  type        = string
+}
+
+variable "admin_password" {
+  description = "Admin password for VMs"
+  type        = string
+  sensitive   = true
+}
+
+variable "subscription_id" {
+  description = "Azure subscription ID"
+  type        = string
+}
+
+# Provider
 provider "azurerm" {
   features {}
   subscription_id = var.subscription_id
@@ -69,4 +98,40 @@ resource "azurerm_windows_virtual_machine" "dc1" {
     sku       = "2022-Datacenter"
     version   = "latest"
   }
+}
+
+# Network Security Group
+resource "azurerm_network_security_group" "dc1_nsg" {
+  name                = "dc1-nsg"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+
+  security_rule {
+    name                       = "Allow-RDP"
+    priority                   = 100
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range         = "*"
+    destination_port_range    = "3389"
+    source_address_prefix     = "*"
+    destination_address_prefix = "*"
+  }
+}
+
+# Associate NSG with NIC
+resource "azurerm_network_interface_security_group_association" "dc1_nsg_association" {
+  network_interface_id      = azurerm_network_interface.dc1_nic.id
+  network_security_group_id = azurerm_network_security_group.dc1_nsg.id
+}
+
+# Enable Azure Security Center (Microsoft Defender for Cloud) - Required for JIT
+resource "azurerm_security_center_subscription_pricing" "example" {
+  tier          = "Standard"
+  resource_type = "VirtualMachines"
+}
+
+# Output
+output "dc1_public_ip" {
+  value = azurerm_public_ip.dc1_pip.ip_address
 }
