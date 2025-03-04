@@ -100,6 +100,12 @@ resource "azurerm_windows_virtual_machine" "dc1" {
   }
 }
 
+# This security group makes this warning go away. In production, this would not be best 
+# practices for security. We would want the rule to be more granular and not allow traffic from the web. 
+# We would want a vpn or at the very least a bastion but I'm just doing a lab in a sandbox so we don't 
+# want to take the time to set up a vpn or pay for an extra vm as a bastion. 
+# Once I prove what I want to test I'll do a `terraform destroy` and none of this will exist.
+
 # Network Security Group
 resource "azurerm_network_security_group" "dc1_nsg" {
   name                = "dc1-nsg"
