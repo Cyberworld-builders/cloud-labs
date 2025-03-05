@@ -93,7 +93,7 @@ resource "azurerm_windows_virtual_machine" "dc1" {
   name                  = "dc1-vm"
   resource_group_name   = azurerm_resource_group.rg.name
   location              = azurerm_resource_group.rg.location
-  size                  = "Standard_D2s_v3" # 2 vCPUs, 8 GB RAM
+  size                  = "Standard_D2s_v3"
   admin_username        = var.admin_username
   admin_password        = var.admin_password
   network_interface_ids = [azurerm_network_interface.dc1_nic.id]
@@ -109,6 +109,52 @@ resource "azurerm_windows_virtual_machine" "dc1" {
     sku       = "2022-Datacenter"
     version   = "latest"
   }
+
+#   source_image_id = "/subscriptions/${var.subscription_id}/resourceGroups/${var.resource_group_name}/providers/Microsoft.Compute/images/dc1-image-7adlabsandbox"
+
+  # Optional: Add custom_data to automate AD DS setup
+  custom_data = base64encode(<<-EOF
+  <powershell>
+    # Ensure the script runs with administrative privileges
+    if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+        Start-Process powershell -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `$PSCommandPath" -Verb RunAs
+        exit
+    }
+
+    # Configure network settings (static IP and DNS)
+    $interface = Get-NetAdapter | Where-Object {$_.Status -eq "Up"}
+    if ($interface) {
+        # Set static IP (adjust as needed for your VNet)
+        New-NetIPAddress -InterfaceAlias $interface.Name -IPAddress "10.0.1.10" -PrefixLength 24 -DefaultGateway "10.0.1.1"
+        
+        # Set DNS to self (DC will be DNS server)
+        Set-DnsClientServerAddress -InterfaceAlias $interface.Name -ServerAddresses ("10.0.1.10")
+    }
+
+    # Install Active Directory Domain Services role and tools
+    Install-WindowsFeature -Name AD-Domain-Services -IncludeManagementTools
+
+    # Promote the server to a domain controller (new forest)
+    $password = Get-Content -Path "C:\Scripts\password.txt"
+    $securePassword = ConvertTo-SecureString $password -AsPlainText -Force
+    Install-ADDSForest -DomainName "7-ad-lab.sandbox" `
+                    -DomainNetbiosName "7-AD-LAB" `
+                    -ForestMode WinThreshold `
+                    -DomainMode WinThreshold `
+                    -InstallDns `
+                    -SafeModeAdministratorPassword $securePassword `
+                    -Force `
+                    -NoRebootOnCompletion
+
+    # Optional: Add custom configurations (e.g., GPOs, users)
+    # Example: Create a test user
+    # New-ADUser -Name "TestUser" -SamAccountName "testuser" -AccountPassword $password -Enabled $true
+
+    # Note: The server will need to reboot manually after promotion to complete the configuration
+    Write-Host "AD DS installation and promotion completed. Please reboot the server to finalize the configuration."
+  </powershell>
+  EOF
+  )
 }
 
 # This security group makes this warning go away. In production, this would not be best 
@@ -197,7 +243,7 @@ resource "azurerm_virtual_machine_extension" "dc_setup" {
   type_handler_version = "1.10"
 
   protected_settings = jsonencode({
-    "commandToExecute" = "powershell.exe -Command \"$password = (Invoke-RestMethod -Headers @{\'Authorization\'='Bearer '+(Get-AzAccessToken).Token} -Uri '${azurerm_key_vault.ad_vault.vault_uri}secrets/dsrm-password?api-version=2016-10-01').value; ${file("domain_controller_setup.ps1")}\""
+    "commandToExecute" = "powershell.exe -Command \"$password = (Invoke-RestMethod -Headers @{Authorization='Bearer '+(Get-AzAccessToken).Token} -Uri '${azurerm_key_vault.ad_vault.vault_uri}secrets/dsrm-password?api-version=2016-10-01').value; ${file("domain_controller_setup.ps1")}\""
   })
 
   depends_on = [
