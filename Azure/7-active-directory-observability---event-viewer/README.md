@@ -1,5 +1,7 @@
 # Active Directory Observability - Event Viewer #7
 
+https://grok.com/chat/30c2515a-ef3a-46b3-8876-6b285a72ef6a
+
 Given your background as a cloud architect and preference for Azure with Terraform, setting up an Active Directory (AD) sandbox in Azure is a perfect fit. This approach leverages your cloud expertise, provides scalability, and lets you manage infrastructure as code (IaC). Below is a detailed guide to launching an AD sandbox in Azure using Terraform, tailored for practicing domain controllers (DCs) and Group Policy Objects (GPOs).
 
 ---
