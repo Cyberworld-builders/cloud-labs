@@ -229,3 +229,27 @@ To add a second DC or a client VM, extend the Terraform code:
 ---
 
 This setup gives you a fully functional AD sandbox in Azure, manageable via Terraform. Let me know if you want to refine the code further (e.g., NSGs, automation scripts) or troubleshoot any deployment steps!
+
+
+**PowerShell Script for AD DS Deployment**
+```ps1
+#
+# Windows PowerShell script for AD DS Deployment
+#
+
+Import-Module ADDSDeployment
+Install-ADDSForest `
+-CreateDnsDelegation:$false `
+-DatabasePath "C:\Windows\NTDS" `
+-DomainMode "WinThreshold" `
+-DomainName "7-ad-lab.sandbox" `
+-DomainNetbiosName "7-AD-LAB" `
+-ForestMode "WinThreshold" `
+-InstallDns:$true `
+-LogPath "C:\Windows\NTDS" `
+-NoRebootOnCompletion:$false `
+-SysvolPath "C:\Windows\SYSVOL" `
+-Force:$true
+
+
+```

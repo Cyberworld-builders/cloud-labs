@@ -26,9 +26,20 @@ variable "subscription_id" {
   type        = string
 }
 
+variable "dsrm_password" {
+  description = "DSRM password for the domain controller"
+  type        = string
+  sensitive   = true
+}
+
 # Provider
 provider "azurerm" {
-  features {}
+  features {
+    key_vault {
+      purge_soft_delete_on_destroy    = true
+      recover_soft_deleted_key_vaults = true
+    }
+  }
   subscription_id = var.subscription_id
 }
 
@@ -135,6 +146,64 @@ resource "azurerm_network_interface_security_group_association" "dc1_nsg_associa
 resource "azurerm_security_center_subscription_pricing" "example" {
   tier          = "Standard"
   resource_type = "VirtualMachines"
+}
+
+# Create Azure Key Vault
+resource "azurerm_key_vault" "ad_vault" {
+  name                        = "ad-lab-vault-${random_string.random.result}"
+  location                    = azurerm_resource_group.rg.location
+  resource_group_name         = azurerm_resource_group.rg.name
+  enabled_for_disk_encryption = true
+  tenant_id                  = data.azurerm_client_config.current.tenant_id
+  soft_delete_retention_days  = 7
+  purge_protection_enabled    = false
+  sku_name                   = "standard"
+
+  access_policy {
+    tenant_id = data.azurerm_client_config.current.tenant_id
+    object_id = data.azurerm_client_config.current.object_id
+
+    secret_permissions = [
+      "Get", "List", "Set", "Delete", "Purge"
+    ]
+  }
+}
+
+# Random string to ensure unique Key Vault name
+resource "random_string" "random" {
+  length  = 8
+  special = false
+  upper   = false
+}
+
+# Get current Azure configuration
+data "azurerm_client_config" "current" {}
+
+# Store the DSRM password in Key Vault
+resource "azurerm_key_vault_secret" "dsrm_password" {
+  name         = "dsrm-password"
+  value        = var.dsrm_password
+  key_vault_id = azurerm_key_vault.ad_vault.id
+
+  depends_on = [azurerm_key_vault.ad_vault]
+}
+
+# Custom script extension to configure DC
+resource "azurerm_virtual_machine_extension" "dc_setup" {
+  name                 = "dc-setup"
+  virtual_machine_id   = azurerm_windows_virtual_machine.dc1.id
+  publisher            = "Microsoft.Compute"
+  type                 = "CustomScriptExtension"
+  type_handler_version = "1.10"
+
+  protected_settings = jsonencode({
+    "commandToExecute" = "powershell.exe -Command \"$password = (Invoke-RestMethod -Headers @{\'Authorization\'='Bearer '+(Get-AzAccessToken).Token} -Uri '${azurerm_key_vault.ad_vault.vault_uri}secrets/dsrm-password?api-version=2016-10-01').value; ${file("domain_controller_setup.ps1")}\""
+  })
+
+  depends_on = [
+    azurerm_windows_virtual_machine.dc1,
+    azurerm_key_vault_secret.dsrm_password
+  ]
 }
 
 # Output
