@@ -101,3 +101,28 @@ resource "azurerm_network_interface" "app_nic" {
     public_ip_address_id          = azurerm_public_ip.app_public_ip.id
   }
 }
+
+# The following is for quick access to the sandbox. Don't do anything like this in production, especially for enterprise environments.
+
+# Public IP for NVR (for RDP)
+resource "azurerm_public_ip" "nvr_public_ip" {
+  name                = "nvr-public-ip"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+  allocation_method   = "Static"
+}
+
+# Network Interface for NVR
+resource "azurerm_network_interface" "nvr_nic" {
+  name                = "nvr-nic"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+
+  ip_configuration {
+    name                          = "nvr-ip-config"
+    subnet_id                     = azurerm_subnet.nvr_subnet.id
+    private_ip_address_allocation = "Static"
+    private_ip_address            = "10.61.108.20"
+    public_ip_address_id          = azurerm_public_ip.nvr_public_ip.id
+  }
+}
