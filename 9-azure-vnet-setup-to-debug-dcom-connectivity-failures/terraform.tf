@@ -7,12 +7,12 @@ terraform {
     }
   }
 
-  # backend "azurerm" {
-  #   resource_group_name  = "az-cyberworld-sandbox-ops"
-  #   storage_account_name = "cyberworldsandboxtfstate"
-  #   container_name       = "terraform-state"
-  #   key                  = "lenel-dcom-troubleshooting.tfstate"
-  # }
+  backend "azurerm" {
+    resource_group_name  = "az-cyberworld-sandbox-ops"
+    storage_account_name = "cyberworldsandboxtfstate"
+    container_name       = "terraform-state"
+    key                  = "lenel-dcom-troubleshooting.tfstate"
+  }
 }
 
 # Configure the Azure provider to use the current logged-in user
